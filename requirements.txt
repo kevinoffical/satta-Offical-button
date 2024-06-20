@@ -1,0 +1,6 @@
+Flask
+pyTelegramBotAPI
+requests
+beautifulsoup4
+openpyxl
+pytz
