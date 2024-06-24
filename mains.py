@@ -2,7 +2,7 @@ import os
 import requests
 from bs4 import BeautifulSoup
 from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from datetime import datetime, timedelta
@@ -24,6 +24,10 @@ bot = telebot.TeleBot(TOKEN)
 
 @app.get('/')
 async def index():
+    return HTMLResponse(content="Bot is Live", status_code=200)
+
+@app.head('/')
+async def index_head():
     return HTMLResponse(content="Bot is Live", status_code=200)
 
 # Constants
