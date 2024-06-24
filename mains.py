@@ -1,25 +1,30 @@
 import os
 import requests
 from bs4 import BeautifulSoup
-from fastapi import FastAPI, Request
-from telebot import TeleBot, types
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.responses import JSONResponse
+import telebot
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from datetime import datetime, timedelta
 import pytz
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Font
 import logging
 import csv
-#from keep_alive import keep_alive
 
-# Initialize FastAPI
 app = FastAPI()
+logging.basicConfig(level=logging.INFO)
 
-# Initialize Telegram bot
+# Telegram bot token from environment variable
 TOKEN = os.environ.get('TOKEN')
 if not TOKEN:
     raise ValueError("Bot token not set in environment variables. Please set the 'TOKEN' variable.")
 
-bot = TeleBot(TOKEN)
+bot = telebot.TeleBot(TOKEN)
+
+@app.get('/')
+async def index():
+    return HTMLResponse(content="Bot is Live", status_code=200)
 
 # Constants
 URL = "https://satta-king-fast.com/"
@@ -43,13 +48,6 @@ GAME_NAMES = {
 # Dictionary to store user data
 user_data = {}
 
-@app.route('/')
-def index():
-    return "Bot is Live"
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-
 def get_current_time():
     """Get current date and time in IST."""
     ist = pytz.timezone(TIMEZONE)
@@ -71,18 +69,19 @@ def send_start(message):
         f"Use the buttons below to get started:"
     )
 
-    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup = InlineKeyboardMarkup(row_width=2)
     buttons = [
-        types.InlineKeyboardButton("Get Chart 📊", callback_data='chart'),
-        types.InlineKeyboardButton("Get Prediction 🔮", callback_data='predict'),
-        types.InlineKeyboardButton("Check My Number 🔍", callback_data='checkmynumber'),
-        types.InlineKeyboardButton("Close 🛑", callback_data='close')
+        InlineKeyboardButton("Get Chart 📊", callback_data='chart'),
+        InlineKeyboardButton("Get Prediction 🔮", callback_data='predict'),
+        InlineKeyboardButton("Check My Number 🔍", callback_data='checkmynumber'),
+        InlineKeyboardButton("Close 🛑", callback_data='close')
     ]
     markup.add(*buttons)
 
     sent_message = bot.send_message(message.chat.id, welcome_message, parse_mode='Markdown', reply_markup=markup)
     user_data[message.chat.id] = {"message_id": sent_message.message_id}
 
+# Update message with new content and markup
 def update_message(chat_id, message_id, new_text, new_markup):
     bot.edit_message_text(new_text, chat_id, message_id, reply_markup=new_markup, parse_mode='Markdown')
 
@@ -96,11 +95,11 @@ def handle_chart(message):
         f"Please select the year for\nwhich you want the chart data:"
     )
 
-    markup = types.InlineKeyboardMarkup(row_width=3)
+    markup = InlineKeyboardMarkup(row_width=3)
     years = [str(year) for year in range(2015, 2025)]
-    year_buttons = [types.InlineKeyboardButton(year, callback_data=f"year_{year}") for year in years]
-    back_button = types.InlineKeyboardButton(f"{EMOJI_BACK} Back", callback_data='back_to_start')
-    close_button = types.InlineKeyboardButton(f"{EMOJI_STOP} Close", callback_data='close')
+    year_buttons = [InlineKeyboardButton(year, callback_data=f"year_{year}") for year in years]
+    back_button = InlineKeyboardButton(f"{EMOJI_BACK} Back", callback_data='back_to_start')
+    close_button = InlineKeyboardButton(f"{EMOJI_STOP} Close", callback_data='close')
     markup.add(*year_buttons)
     markup.add(back_button, close_button)
 
@@ -119,13 +118,13 @@ def handle_predict(message):
         "Please select which game's prediction you want:"
     )
 
-    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup = InlineKeyboardMarkup(row_width=2)
     game_buttons = [
-        types.InlineKeyboardButton(game_info['name'], callback_data=f'predict_{code}')
+        InlineKeyboardButton(game_info['name'], callback_data=f'predict_{code}')
         for code, game_info in GAME_NAMES.items()
     ]
-    back_button = types.InlineKeyboardButton(f"{EMOJI_BACK} Back", callback_data='back_to_start')
-    close_button = types.InlineKeyboardButton(f"{EMOJI_STOP} Close", callback_data='close')
+    back_button = InlineKeyboardButton(f"{EMOJI_BACK} Back", callback_data='back_to_start')
+    close_button = InlineKeyboardButton(f"{EMOJI_STOP} Close", callback_data='close')
     markup.add(*game_buttons)
     markup.add(back_button, close_button)
 
@@ -135,9 +134,9 @@ def handle_predict(message):
 def handle_checkmynumber(message):
     number_prompt = "Tell me your number (between 00 and 99):"
 
-    markup = types.InlineKeyboardMarkup()
-    back_button = types.InlineKeyboardButton(f"{EMOJI_BACK} Back", callback_data='back_to_start')
-    close_button = types.InlineKeyboardButton(f"{EMOJI_STOP} Close", callback_data='close')
+    markup = InlineKeyboardMarkup()
+    back_button = InlineKeyboardButton(f"{EMOJI_BACK} Back", callback_data='back_to_start')
+    close_button = InlineKeyboardButton(f"{EMOJI_STOP} Close", callback_data='close')
     markup.add(back_button, close_button)
 
     sent_message = bot.edit_message_text(number_prompt, message.chat.id, user_data[message.chat.id]["message_id"], reply_markup=markup)
@@ -149,12 +148,12 @@ def get_user_number(message):
         if user_number.isdigit() and 0 <= int(user_number) <= 99:
             user_data[message.chat.id] = {"number": user_number}
 
-            markup = types.InlineKeyboardMarkup(row_width=3)
+            markup = InlineKeyboardMarkup(row_width=3)
             months_buttons = [
-                types.InlineKeyboardButton(f"{months} months", callback_data=f"number_months_{months}")
+                InlineKeyboardButton(f"{months} months", callback_data=f"number_months_{months}")
                 for months in range(6, 121, 6)
             ]
-            close_button = types.InlineKeyboardButton(f"{EMOJI_STOP} Close", callback_data='close')
+            close_button = InlineKeyboardButton(f"{EMOJI_STOP} Close", callback_data='close')
             markup.add(*months_buttons)
             markup.add(close_button)
 
@@ -203,12 +202,12 @@ def handle_callback(call):
         logging.error(f"Callback error: {str(e)}")
 
 def show_month_selection(message, year):
-    markup = types.InlineKeyboardMarkup(row_width=3)
+    markup = InlineKeyboardMarkup(row_width=3)
     months = ["January", "February", "March", "April", "May", "June",
               "July", "August", "September", "October", "November", "December"]
-    buttons = [types.InlineKeyboardButton(month, callback_data=f"month_{month.lower()}_{year}") for month in months]
-    back_button = types.InlineKeyboardButton(f"{EMOJI_BACK} Back to Year Selection", callback_data="back_to_year_selection")
-    close_button = types.InlineKeyboardButton(f"{EMOJI_STOP} Close", callback_data='close')
+    buttons = [InlineKeyboardButton(month, callback_data=f"month_{month.lower()}_{year}") for month in months]
+    back_button = InlineKeyboardButton(f"{EMOJI_BACK} Back to Year Selection", callback_data="back_to_year_selection")
+    close_button = InlineKeyboardButton(f"{EMOJI_STOP} Close", callback_data='close')
     markup.add(*buttons)
     markup.add(back_button, close_button)
     bot.edit_message_text(f"Select the month for {year}:", message.chat.id, user_data[message.chat.id]["message_id"], reply_markup=markup)
@@ -262,9 +261,9 @@ def process_month_selection(call):
             csv_data = file.read()
             formatted_data = format_chart_data(csv_data)
             chart_message = f"Here is the Satta King Chart for {month.capitalize()} {year}:\n\n{formatted_data}"
-            back_button = types.InlineKeyboardButton(f"{EMOJI_BACK} Back to Year Selection", callback_data="back_to_year_selection")
-            close_button = types.InlineKeyboardButton(f"{EMOJI_STOP} Close", callback_data='close')
-            markup = types.InlineKeyboardMarkup().add(back_button, close_button)
+            back_button = InlineKeyboardButton(f"{EMOJI_BACK} Back to Year Selection", callback_data="back_to_year_selection")
+            close_button = InlineKeyboardButton(f"{EMOJI_STOP} Close", callback_data='close')
+            markup = InlineKeyboardMarkup().add(back_button, close_button)
             bot.edit_message_text(chart_message, call.message.chat.id, user_data[call.message.chat.id]["message_id"], reply_markup=markup)
 
         with open(filename, 'rb') as file:
@@ -333,10 +332,10 @@ def handle_prediction_query(call):
             )
             latest_number = yesterday_number
 
-        markup = types.InlineKeyboardMarkup(row_width=2)
-        back_button = types.InlineKeyboardButton(f"{EMOJI_BACK} Back", callback_data="back_to_start")
-        latest_number_button = types.InlineKeyboardButton(f"Check Chart {latest_number} 🎲", callback_data="show_latest_number")
-        close_button = types.InlineKeyboardButton(f"{EMOJI_STOP} Close", callback_data="close")
+        markup = InlineKeyboardMarkup(row_width=2)
+        back_button = InlineKeyboardButton(f"{EMOJI_BACK} Back", callback_data="back_to_start")
+        latest_number_button = InlineKeyboardButton(f"Check Chart {latest_number} 🎲", callback_data="show_latest_number")
+        close_button = InlineKeyboardButton(f"{EMOJI_STOP} Close", callback_data="close")
 
         markup.add(latest_number_button, back_button)
         markup.add(close_button)
@@ -355,13 +354,13 @@ def handle_prediction_query(call):
 
 def show_latest_number(call):
     try:
-        markup = types.InlineKeyboardMarkup(row_width=3)
+        markup = InlineKeyboardMarkup(row_width=3)
         months_buttons = [
-            types.InlineKeyboardButton(f"{months} months", callback_data=f"months_{months}")
+            InlineKeyboardButton(f"{months} months", callback_data=f"months_{months}")
             for months in range(6, 121, 6)
         ]
         markup.add(*months_buttons)
-        markup.add(types.InlineKeyboardButton(f"{EMOJI_BACK} Back", callback_data="back_to_start"))
+        markup.add(InlineKeyboardButton(f"{EMOJI_BACK} Back", callback_data="back_to_start"))
 
         bot.edit_message_text("Select the range for chart data:", call.message.chat.id, call.message.message_id, reply_markup=markup)
 
@@ -374,15 +373,10 @@ def handle_months_selection(call):
     try:
         months = int(call.data.split('_')[1])
         preparing_message = bot.send_message(call.message.chat.id, "Please wait, preparing your file...")
-
         file_path = fetch_chart_data_for_months(months, user_data[call.message.chat.id])
-
         bot.delete_message(call.message.chat.id, preparing_message.message_id)
-
         bot.send_document(call.message.chat.id, open(file_path, 'rb'))
-
         os.remove(file_path)
-
     except Exception as e:
         error_message = f"Error: {str(e)}"
         logging.error(error_message)
@@ -414,7 +408,6 @@ def fetch_chart_data_for_months(months, user_data):
             year = (current_date - timedelta(days=i*30)).year
 
             chart_url = f"https://satta-king-fast.com/chart.php?month={month:02}&year={year}"
-
             response = requests.get(chart_url)
             response.raise_for_status()
 
@@ -464,23 +457,23 @@ def handle_number_months_selection(call):
     try:
         months = int(call.data.split('_')[2])
         user_number = user_data[call.message.chat.id]['number']
-
         preparing_message = bot.send_message(call.message.chat.id, "Please wait, preparing your file...")
-
         file_path = fetch_chart_data_for_months(months, {"latest_number": user_number})
-
         bot.delete_message(call.message.chat.id, preparing_message.message_id)
-
         bot.send_document(call.message.chat.id, open(file_path, 'rb'))
-
         os.remove(file_path)
-
     except Exception as e:
         error_message = f"Error: {str(e)}"
         logging.error(error_message)
         bot.send_message(call.message.chat.id, error_message)
 
+@app.post('/webhook/')
+async def webhook(request: Request):
+    json_str = await request.json()
+    update = telebot.types.Update.de_json(json_str)
+    bot.process_new_updates([update])
+    return JSONResponse(content={"status": "ok"})
+
 if __name__ == "__main__":
-    #keep_alive()
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
