@@ -4,3 +4,5 @@ requests
 beautifulsoup4
 openpyxl
 pytz
+fastapi
+uvicorn
