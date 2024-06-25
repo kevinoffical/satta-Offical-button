@@ -30,6 +30,13 @@ async def index():
 async def index_head():
     return HTMLResponse(content="Bot is Live", status_code=200)
 
+@app.post('/webhook/')
+async def webhook(request: Request):
+    json_str = await request.json()
+    update = telebot.types.Update.de_json(json_str)
+    bot.process_new_updates([update])
+    return JSONResponse(content={"status": "ok"})
+
 # Constants
 URL = "https://satta-king-fast.com/"
 TIMEZONE = 'Asia/Kolkata'
@@ -471,12 +478,6 @@ def handle_number_months_selection(call):
         logging.error(error_message)
         bot.send_message(call.message.chat.id, error_message)
 
-@app.post('/webhook/')
-async def webhook(request: Request):
-    json_str = await request.json()
-    update = telebot.types.Update.de_json(json_str)
-    bot.process_new_updates([update])
-    return JSONResponse(content={"status": "ok"})
 
 if __name__ == "__main__":
     import uvicorn
