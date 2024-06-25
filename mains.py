@@ -22,13 +22,6 @@ if not TOKEN:
 
 bot = telebot.TeleBot(TOKEN)
 
-@app.post('/webhook/')
-async def webhook(request: Request):
-    json_str = await request.json()
-    update = telebot.types.Update.de_json(json_str)
-    bot.process_new_updates([update])
-    return JSONResponse(content={"status": "ok"})
-
 @app.get('/')
 async def index():
     return HTMLResponse(content="Bot is Live", status_code=200)
@@ -477,6 +470,13 @@ def handle_number_months_selection(call):
         error_message = f"Error: {str(e)}"
         logging.error(error_message)
         bot.send_message(call.message.chat.id, error_message)
+
+@app.post('/webhook/')
+async def webhook(request: Request):
+    json_str = await request.json()
+    update = telebot.types.Update.de_json(json_str)
+    bot.process_new_updates([update])
+    return JSONResponse(content={"status": "ok"})
 
 if __name__ == "__main__":
     import uvicorn
